@@ -523,8 +523,6 @@ def cb_back(call: CallbackQuery):
 # ─── /getext — пользователь запрашивает расширение ───────────────────────────
 @bot.message_handler(commands=["getext"])
 def cmd_getext(msg: Message):
-    if is_admin(msg):
-        return bot.send_message(msg.chat.id, "👑 Используй /sendext <user_id> чтобы выдать расширение.")
 
     uid   = str(msg.from_user.id)
     uname = msg.from_user.username or ""
