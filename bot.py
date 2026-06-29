@@ -93,6 +93,7 @@ def cmd_start(msg: Message):
         bot.send_message(msg.chat.id,
             f"👑 Привет, администратор <b>{msg.from_user.first_name}</b>!\n\n"
             "/token — получить свой месячный токен\n"
+            "/getext — скачать расширение\n"
             "/admin — панель управления\n"
             "/help — помощь"
         )
@@ -523,6 +524,16 @@ def cb_back(call: CallbackQuery):
 # ─── /getext — пользователь запрашивает расширение ───────────────────────────
 @bot.message_handler(commands=["getext"])
 def cmd_getext(msg: Message):
+    if is_admin(msg):
+        zip_path = os.path.join(os.path.dirname(__file__), "extension.zip")
+        if not os.path.exists(zip_path):
+            return bot.send_message(msg.chat.id, "❌ Файл extension.zip не найден.")
+        with open(zip_path, "rb") as f:
+            bot.send_document(msg.chat.id, f,
+                caption="📦 <b>TTS расширение для Chrome</b>",
+                visible_file_name="tts-extension.zip"
+            )
+        return
 
     uid   = str(msg.from_user.id)
     uname = msg.from_user.username or ""
