@@ -255,6 +255,13 @@ def cb_shift(call: CallbackQuery):
             call.message.chat.id,
             call.message.message_id
         )
+        notify_admins(
+            f"🔑 <b>Новый токен</b>\n\n"
+            f"👤 {fname} (@{uname})\n"
+            f"🆔 ID: <code>{uid}</code>\n"
+            f"⏰ Смена: {shift_label}\n"
+            f"⏱ До: {end_str}"
+        )
     elif data.get("error") == "blocked":
         bot.edit_message_text("🚫 Твой доступ заблокирован. Обратись к администратору.",
                               call.message.chat.id, call.message.message_id)
