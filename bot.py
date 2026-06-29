@@ -157,11 +157,17 @@ def cmd_subscribe(msg: Message):
             InlineKeyboardButton("✅ Одобрить", callback_data=f"approve_{uid}"),
             InlineKeyboardButton("❌ Отклонить", callback_data=f"deny_{uid}")
         )
+        markup2 = InlineKeyboardMarkup()
+        markup2.row(
+            InlineKeyboardButton("✅ Смена", callback_data=f"approve_{uid}"),
+            InlineKeyboardButton("🗓 Месяц", callback_data=f"approve_monthly_{uid}"),
+            InlineKeyboardButton("❌ Отклонить", callback_data=f"deny_{uid}")
+        )
         notify_admins(
             f"📩 <b>Новая заявка на подписку</b>\n\n"
             f"👤 {fname} (@{uname})\n"
             f"🆔 ID: <code>{uid}</code>",
-            markup
+            markup2
         )
     elif data.get("error") == "already_subscribed":
         d = data.get("days_left", 0)
@@ -271,6 +277,7 @@ def cmd_admin(msg: Message):
     markup.row(InlineKeyboardButton("👥 Активные токены", callback_data="admin_tokens"))
     markup.row(InlineKeyboardButton("📩 Заявки на подписку", callback_data="admin_subs"))
     markup.row(InlineKeyboardButton("📦 Статус загрузок", callback_data="admin_downloads"))
+    markup.row(InlineKeyboardButton("🗓 Выдать месячный токен", callback_data="admin_grant_monthly"))
     markup.row(InlineKeyboardButton("🚫 Заблокировать пользователя", callback_data="admin_block_ask"))
     markup.row(InlineKeyboardButton("✅ Разблокировать", callback_data="admin_unblock_ask"))
 
@@ -343,6 +350,51 @@ def cb_admin_subs(call: CallbackQuery):
                           reply_markup=markup)
 
 # ─── Callback: одобрить / отклонить подписку ──────────────────────────────────
+@bot.callback_query_handler(func=lambda c: c.data.startswith("approve_monthly_"))
+def cb_approve_monthly(call: CallbackQuery):
+    if not is_admin(call):
+        return bot.answer_callback_query(call.id, "Нет доступа")
+
+    uid = call.data.split("approve_monthly_", 1)[1]
+    _grant_monthly_token(call, uid)
+
+
+def _grant_monthly_token(call: CallbackQuery, uid: str):
+    """Выдаёт месячный токен пользователю и уведомляет его."""
+    uname = ""
+    fname = uid
+    expires_at = admin_monthly_expires()
+    data = api("generate", user_id=uid, expires_at=expires_at,
+               shift="monthly", username=uname, first_name=fname)
+    if data.get("ok"):
+        token = data["token"]
+        now = now_kyiv()
+        if now.month == 12:
+            end_str = f"1 января {now.year+1}"
+        else:
+            import calendar
+            end_str = f"1 {['','янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'][now.month+1]} {now.year}"
+        bot.answer_callback_query(call.id, "✅ Месячный токен выдан")
+        try:
+            bot.send_message(int(uid),
+                f"✅ <b>Тебе выдан месячный токен!</b>\n\n"
+                f"<code>{token}</code>\n\n"
+                f"📅 Действует до: <b>{end_str}</b>\n"
+                f"📋 Нажми на код чтобы скопировать"
+            )
+        except Exception:
+            pass
+        try:
+            bot.edit_message_text(
+                call.message.text + f"\n\n✅ Выдан месячный токен",
+                call.message.chat.id, call.message.message_id
+            )
+        except Exception:
+            pass
+    else:
+        bot.answer_callback_query(call.id, f"Ошибка: {data.get('error')}")
+
+
 @bot.callback_query_handler(func=lambda c: c.data.startswith("approve_") or c.data.startswith("deny_"))
 def cb_sub_decision(call: CallbackQuery):
     if not is_admin(call):
@@ -369,7 +421,6 @@ def cb_sub_decision(call: CallbackQuery):
             except Exception:
                 pass
 
-        # Обновляем сообщение
         try:
             bot.edit_message_text(
                 call.message.text + f"\n\n{'✅ Одобрено' if approve else '❌ Отклонено'}",
@@ -399,6 +450,21 @@ def cb_revoke(call: CallbackQuery):
         cb_admin_tokens(call)
     else:
         bot.answer_callback_query(call.id, f"Ошибка: {data.get('error')}")
+
+# ─── Callback: выдать месячный токен вручную ──────────────────────────────────
+@bot.callback_query_handler(func=lambda c: c.data == "admin_grant_monthly")
+def cb_grant_monthly_ask(call: CallbackQuery):
+    if not is_admin(call):
+        return
+    msg = bot.send_message(call.message.chat.id, "Введи ID пользователя для выдачи месячного токена:")
+    bot.register_next_step_handler(msg, lambda m: do_grant_monthly(m, call))
+    bot.answer_callback_query(call.id)
+
+def do_grant_monthly(msg: Message, call: CallbackQuery):
+    if not is_admin(msg):
+        return
+    uid = msg.text.strip()
+    _grant_monthly_token(call, uid)
 
 # ─── Callback: блок/анблок ────────────────────────────────────────────────────
 @bot.callback_query_handler(func=lambda c: c.data in ("admin_block_ask", "admin_unblock_ask"))
@@ -440,6 +506,7 @@ def cb_back(call: CallbackQuery):
     markup.row(InlineKeyboardButton("👥 Активные токены", callback_data="admin_tokens"))
     markup.row(InlineKeyboardButton("📩 Заявки на подписку", callback_data="admin_subs"))
     markup.row(InlineKeyboardButton("📦 Статус загрузок", callback_data="admin_downloads"))
+    markup.row(InlineKeyboardButton("🗓 Выдать месячный токен", callback_data="admin_grant_monthly"))
     markup.row(InlineKeyboardButton("🚫 Заблокировать пользователя", callback_data="admin_block_ask"))
     markup.row(InlineKeyboardButton("✅ Разблокировать", callback_data="admin_unblock_ask"))
     bot.edit_message_text("👑 <b>Панель администратора</b>",
