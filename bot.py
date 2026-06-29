@@ -71,13 +71,9 @@ def shift_expires_at(shift: str) -> int:
     return int(end.timestamp())
 
 def admin_monthly_expires() -> int:
-    """Токен для админа — до конца текущего месяца."""
+    """Токен для админа — 30 дней от текущего момента."""
     now = now_kyiv()
-    if now.month == 12:
-        end = now.replace(year=now.year+1, month=1, day=1, hour=0, minute=0, second=0)
-    else:
-        end = now.replace(month=now.month+1, day=1, hour=0, minute=0, second=0)
-    return int(end.timestamp())
+    return int((now + timedelta(days=30)).timestamp())
 
 def notify_admins(text: str, markup=None):
     for aid in ADMIN_IDS:
