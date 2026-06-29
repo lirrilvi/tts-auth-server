@@ -10,7 +10,8 @@ load_dotenv()
 
 BOT_TOKEN  = os.getenv("BOT_TOKEN")
 BOT_SECRET = os.getenv("BOT_SECRET", "change_me")
-SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5055")
+_port      = int(os.getenv("PORT", 5055))
+SERVER_URL = f"http://localhost:{_port}"
 
 if not BOT_TOKEN:
     raise RuntimeError("Укажи BOT_TOKEN в .env")
