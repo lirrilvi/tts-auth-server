@@ -184,6 +184,18 @@ def active_tokens():
     return jsonify({"ok": True, "tokens": [dict(r) for r in rows]})
 
 
+@app.route("/api/all_users", methods=["POST"])
+def all_users():
+    data = request.get_json(silent=True) or {}
+    if data.get("bot_secret") != BOT_SECRET:
+        return jsonify({"ok": False, "error": "unauthorized"}), 403
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT user_id, username, first_name FROM users WHERE is_blocked != 1"
+        ).fetchall()
+    return jsonify({"ok": True, "users": [dict(r) for r in rows]})
+
+
 @app.route("/api/sub_request", methods=["POST"])
 def sub_request():
     data = request.get_json(silent=True) or {}

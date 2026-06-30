@@ -655,11 +655,11 @@ def cmd_sendupdate(msg):
     if not os.path.exists(zip_path):
         return bot.send_message(msg.chat.id, "❌ Файл extension.zip не найден.")
 
-    # Получаем всех пользователей с активными токенами
-    data = api("active_tokens")
-    users = data.get("tokens", [])
+    # Получаем всех зарегистрированных пользователей (не забаненных)
+    data = api("all_users")
+    users = data.get("users", [])
     if not users:
-        return bot.send_message(msg.chat.id, "⚠️ Нет пользователей с активными токенами.")
+        return bot.send_message(msg.chat.id, "⚠️ Нет зарегистрированных пользователей.")
 
     status = bot.send_message(msg.chat.id, f"⏳ Рассылаю обновление {len(users)} пользователям...")
 
