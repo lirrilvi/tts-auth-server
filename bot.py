@@ -527,8 +527,15 @@ def cmd_getext(msg: Message):
             return bot.send_message(msg.chat.id, "❌ Файл extension.zip не найден.")
         with open(zip_path, "rb") as f:
             bot.send_document(msg.chat.id, f,
-                caption="📦 <b>TTS расширение для Chrome</b>",
-                visible_file_name="tts-extension.zip"
+                caption=(
+                    "📦 <b>TTS расширение для Chrome</b>\n\n"
+                    "🎙 Аудио — озвучка текста через MiniMax\n"
+                    "⭕ Виджет % — рисует круговой виджет и заливает на сайт\n"
+                    "🧮 Калькулятор Syndicate — кредиты / баланс / цена\n"
+                    "🖼 ПКМ на фото/видео → Размыть (25/50/75/100%)"
+                ),
+                visible_file_name="tts-extension.zip",
+                parse_mode="HTML"
             )
         return
 
