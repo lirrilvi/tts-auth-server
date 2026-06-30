@@ -1,8 +1,6 @@
 """
-TTS Auth Server v2 — PostgreSQL edition
+TTS Auth Server v2 — PostgreSQL (with SQLite fallback)
 """
-import psycopg2
-import psycopg2.extras
 import secrets, string, time, os
 from contextlib import contextmanager
 from flask import Flask, request, jsonify, send_file, abort
@@ -16,76 +14,128 @@ CORS(app)
 
 BOT_SECRET    = os.getenv("BOT_SECRET", "change_me")
 _DATABASE_URL = os.getenv("DATABASE_URL", "")
+USE_PG        = bool(_DATABASE_URL)   # True when PostgreSQL addon is connected
 
+# ─── DB abstraction: PostgreSQL or SQLite fallback ────────────────────────────
 
-def _db_url():
-    # Railway gives postgres:// but psycopg2 needs postgresql://
-    url = _DATABASE_URL
-    if url.startswith("postgres://"):
-        url = "postgresql://" + url[len("postgres://"):]
-    return url
+if USE_PG:
+    import psycopg2
+    import psycopg2.extras
 
+    def _pg_url():
+        url = _DATABASE_URL
+        if url.startswith("postgres://"):
+            url = "postgresql://" + url[len("postgres://"):]
+        return url
 
-@contextmanager
-def get_db():
-    conn = psycopg2.connect(_db_url())
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    @contextmanager
+    def get_db():
+        conn = psycopg2.connect(_pg_url())
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
+    def q(conn, sql, params=()):
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(sql, params)
+        return cur
 
-def q(conn, sql, params=()):
-    """Execute query, return cursor with RealDictRow results."""
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cur.execute(sql, params)
-    return cur
+    PH = "%s"   # PostgreSQL placeholder
+
+else:
+    # SQLite fallback (data resets on redeploy — temporary until PG is added)
+    import sqlite3
+
+    DB_PATH = "tokens.db"
+
+    @contextmanager
+    def get_db():
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def q(conn, sql, params=()):
+        # Convert %s → ? for SQLite
+        sql = sql.replace("%s", "?")
+        return conn.execute(sql, params)
+
+    PH = "%s"   # we always write %s in code, q() converts for SQLite
 
 
 def init_db():
     with get_db() as conn:
-        q(conn, """
-            CREATE TABLE IF NOT EXISTS users (
-                user_id          TEXT PRIMARY KEY,
-                username         TEXT,
-                first_name       TEXT,
-                is_blocked       INTEGER DEFAULT 0,
-                subscription_end INTEGER DEFAULT 0
-            )
-        """)
-        q(conn, """
-            CREATE TABLE IF NOT EXISTS tokens (
-                id         SERIAL PRIMARY KEY,
-                user_id    TEXT NOT NULL,
-                token      TEXT NOT NULL UNIQUE,
-                created_at INTEGER NOT NULL,
-                expires_at INTEGER NOT NULL,
-                shift      TEXT
-            )
-        """)
-        q(conn, """
-            CREATE TABLE IF NOT EXISTS downloads (
-                user_id       TEXT PRIMARY KEY,
-                dl_token      TEXT UNIQUE,
-                created_at    INTEGER,
-                downloaded    INTEGER DEFAULT 0,
-                downloaded_at INTEGER
-            )
-        """)
-        q(conn, """
-            CREATE TABLE IF NOT EXISTS sub_requests (
-                id           SERIAL PRIMARY KEY,
-                user_id      TEXT NOT NULL,
-                username     TEXT,
-                first_name   TEXT,
-                requested_at INTEGER NOT NULL,
-                status       TEXT DEFAULT 'pending'
-            )
-        """)
+        if USE_PG:
+            q(conn, """
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id          TEXT PRIMARY KEY,
+                    username         TEXT,
+                    first_name       TEXT,
+                    is_blocked       INTEGER DEFAULT 0,
+                    subscription_end INTEGER DEFAULT 0
+                )
+            """)
+            q(conn, """
+                CREATE TABLE IF NOT EXISTS tokens (
+                    id         SERIAL PRIMARY KEY,
+                    user_id    TEXT NOT NULL,
+                    token      TEXT NOT NULL UNIQUE,
+                    created_at INTEGER NOT NULL,
+                    expires_at INTEGER NOT NULL,
+                    shift      TEXT
+                )
+            """)
+            q(conn, """
+                CREATE TABLE IF NOT EXISTS downloads (
+                    user_id       TEXT PRIMARY KEY,
+                    dl_token      TEXT UNIQUE,
+                    created_at    INTEGER,
+                    downloaded    INTEGER DEFAULT 0,
+                    downloaded_at INTEGER
+                )
+            """)
+            q(conn, """
+                CREATE TABLE IF NOT EXISTS sub_requests (
+                    id           SERIAL PRIMARY KEY,
+                    user_id      TEXT NOT NULL,
+                    username     TEXT,
+                    first_name   TEXT,
+                    requested_at INTEGER NOT NULL,
+                    status       TEXT DEFAULT 'pending'
+                )
+            """)
+        else:
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id TEXT PRIMARY KEY, username TEXT, first_name TEXT,
+                    is_blocked INTEGER DEFAULT 0, subscription_end INTEGER DEFAULT 0
+                );
+                CREATE TABLE IF NOT EXISTS tokens (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL,
+                    token TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL,
+                    expires_at INTEGER NOT NULL, shift TEXT
+                );
+                CREATE TABLE IF NOT EXISTS downloads (
+                    user_id TEXT PRIMARY KEY, dl_token TEXT UNIQUE,
+                    created_at INTEGER, downloaded INTEGER DEFAULT 0, downloaded_at INTEGER
+                );
+                CREATE TABLE IF NOT EXISTS sub_requests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL,
+                    username TEXT, first_name TEXT, requested_at INTEGER NOT NULL,
+                    status TEXT DEFAULT 'pending'
+                );
+            """)
 
 
 def make_token(length=8):
