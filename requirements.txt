@@ -3,3 +3,4 @@ flask-cors
 pytelegrambotapi
 requests
 python-dotenv
+psycopg2-binary
