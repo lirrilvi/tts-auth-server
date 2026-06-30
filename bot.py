@@ -543,18 +543,6 @@ def cmd_getext(msg: Message):
     uname = msg.from_user.username or ""
     fname = msg.from_user.first_name or ""
 
-    # Проверяем не скачал ли уже
-    status_data = api("download_status")
-    for item in status_data.get("downloads", []):
-        if item["user_id"] == uid:
-            if item["downloaded"]:
-                return bot.send_message(msg.chat.id,
-                    "✅ Ты уже скачал расширение.\n"
-                    "Если нужна помощь с установкой — обратись к администратору.")
-            else:
-                return bot.send_message(msg.chat.id,
-                    "⏳ Твой запрос уже отправлен — ожидай одобрения администратора.")
-
     # Уведомляем всех админов
     markup = InlineKeyboardMarkup()
     markup.row(
