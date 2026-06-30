@@ -610,6 +610,10 @@ def cb_ext_decision(call: CallbackQuery):
             bot.send_document(int(uid), f,
                 caption=(
                     "📦 <b>TTS расширение для Chrome</b>\n\n"
+                    "🎙 Аудио — озвучка текста через MiniMax\n"
+                    "⭕ Виджет % — рисует круговой виджет и заливает на сайт\n"
+                    "🧮 Калькулятор Syndicate — кредиты / баланс / цена\n"
+                    "🖼 ПКМ на фото/видео → Размыть (25/50/75/100%)\n\n"
                     "<b>Как установить:</b>\n"
                     "1. Распакуй ZIP архив\n"
                     "2. Открой <code>chrome://extensions</code>\n"
@@ -617,7 +621,8 @@ def cb_ext_decision(call: CallbackQuery):
                     "4. Нажми <b>Загрузить распакованное</b> → выбери папку <code>tts-ext</code>\n\n"
                     "Затем иди на alpha.date и нажми зелёную кнопку 🗣"
                 ),
-                visible_file_name="tts-extension.zip"
+                visible_file_name="tts-extension.zip",
+                parse_mode="HTML"
             )
         bot.send_message(int(uid),
             "✅ После установки расширения получи токен командой /token"
