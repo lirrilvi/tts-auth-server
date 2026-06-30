@@ -90,6 +90,7 @@ def cmd_start(msg: Message):
             f"👑 Привет, администратор <b>{msg.from_user.first_name}</b>!\n\n"
             "/token — получить свой месячный токен\n"
             "/getext — скачать расширение\n"
+            "/sendupdate — разослать обновление расширения всем\n"
             "/admin — панель управления\n"
             "/help — помощь"
         )
@@ -623,6 +624,68 @@ def cb_ext_decision(call: CallbackQuery):
             pass
     except Exception as e:
         bot.answer_callback_query(call.id, f"Ошибка отправки: {e}")
+
+
+# ─── /sendupdate — разослать обновление расширения всем пользователям ────────
+UPDATE_TEXT = (
+    "🆕 <b>Обновление расширения TTS Voice</b>\n\n"
+    "⭕ <b>Виджет %</b>\n"
+    "Новая вкладка в панели. Вводишь число от 0 до 100 (можно с дробью: 75,54) → "
+    "нажимаешь \"Нарисовать\" → видишь превью → \"Загрузить на сайт\" — и виджет сам отправляется в чат.\n\n"
+    "🧮 <b>Калькулятор Syndicate</b>\n"
+    "Ещё одна вкладка. Вводишь кредиты / баланс / цену — выбираешь пакет (45/85/200/830 cr) — расчёт показывается автоматически.\n\n"
+    "🖼 <b>Размытие фото/видео</b>\n"
+    "Правый клик на любом фото или видео в чате → появляется меню от расширения:\n"
+    "• <b>Размыть</b> — выбираешь степень: 25% / 50% / 75% / 100%\n"
+    "• <b>Размыть + BLOCKED</b> — то же самое но с красным знаком поверх\n"
+    "Фото заменяется прямо на месте — ничего никуда не загружается отдельно.\n\n"
+    "<b>Как обновить:</b>\n"
+    "1. Распакуй ZIP архив ниже 👇\n"
+    "2. Открой <code>chrome://extensions</code>\n"
+    "3. Удали старое расширение\n"
+    "4. Нажми <b>Загрузить распакованное</b> → выбери папку → готово"
+)
+
+@bot.message_handler(commands=["sendupdate"])
+def cmd_sendupdate(msg):
+    if not is_admin(msg):
+        return bot.send_message(msg.chat.id, "⛔ Нет доступа.")
+
+    zip_path = os.path.join(os.path.dirname(__file__), "extension.zip")
+    if not os.path.exists(zip_path):
+        return bot.send_message(msg.chat.id, "❌ Файл extension.zip не найден.")
+
+    # Получаем всех пользователей с активными токенами
+    data = api("active_tokens")
+    users = data.get("tokens", [])
+    if not users:
+        return bot.send_message(msg.chat.id, "⚠️ Нет пользователей с активными токенами.")
+
+    status = bot.send_message(msg.chat.id, f"⏳ Рассылаю обновление {len(users)} пользователям...")
+
+    sent, failed = 0, 0
+    for u in users:
+        uid = int(u["user_id"])
+        if uid in ADMIN_IDS:
+            continue
+        try:
+            bot.send_message(uid, UPDATE_TEXT)
+            with open(zip_path, "rb") as f:
+                bot.send_document(uid, f,
+                    caption="📦 <b>TTS расширение v1.2.2</b>",
+                    visible_file_name="tts-extension.zip"
+                )
+            sent += 1
+            import time as _time; _time.sleep(0.07)
+        except Exception:
+            failed += 1
+
+    bot.edit_message_text(
+        f"✅ Рассылка завершена!\n"
+        f"Отправлено: {sent}\n"
+        f"Ошибок: {failed}",
+        msg.chat.id, status.message_id
+    )
 
 
 # ─── /sendext — отправить ссылку на расширение пользователю ──────────────────
