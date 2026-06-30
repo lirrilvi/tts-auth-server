@@ -672,7 +672,12 @@ def cmd_sendupdate(msg):
             bot.send_message(uid, UPDATE_TEXT)
             with open(zip_path, "rb") as f:
                 bot.send_document(uid, f,
-                    caption="📦 <b>TTS расширение v1.2.2</b>",
+                    caption=(
+                        "📦 <b>TTS расширение v1.2.2</b>\n\n"
+                        "⭕ Виджет % — генерация и загрузка в чат\n"
+                        "🧮 Калькулятор Syndicate\n"
+                        "🖼 Правый клик → Размыть фото/видео (4 уровня)"
+                    ),
                     visible_file_name="tts-extension.zip"
                 )
             sent += 1
